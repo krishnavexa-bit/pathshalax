@@ -1,4 +1,4 @@
-// @ts-nocheck -- ported as-is from the original PADHMATE JavaScript source.
+// @ts-nocheck -- ported as-is from the original PathshalaX JavaScript source.
 export const lessons = [
   {
     id: 'foundations',

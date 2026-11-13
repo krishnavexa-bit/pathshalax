@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      chapter_lessons: {
+        Row: {
+          chapter_key: string
+          chapter_title: string
+          class_level: number
+          content: Json
+          created_at: string
+          subject: string
+        }
+        Insert: {
+          chapter_key: string
+          chapter_title: string
+          class_level: number
+          content: Json
+          created_at?: string
+          subject: string
+        }
+        Update: {
+          chapter_key?: string
+          chapter_title?: string
+          class_level?: number
+          content?: Json
+          created_at?: string
+          subject?: string
+        }
+        Relationships: []
+      }
       learning_profiles: {
         Row: {
           completed_at: string | null
@@ -74,6 +101,39 @@ export type Database = {
           imported_at?: string
           personalization?: Json | null
           progress?: Json | null
+        }
+        Relationships: []
+      }
+      student_settings: {
+        Row: {
+          avatar: string
+          class_level: number
+          daily_goal: number
+          display_name: string
+          subjects: string[]
+          theme: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar?: string
+          class_level?: number
+          daily_goal?: number
+          display_name?: string
+          subjects?: string[]
+          theme?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar?: string
+          class_level?: number
+          daily_goal?: number
+          display_name?: string
+          subjects?: string[]
+          theme?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

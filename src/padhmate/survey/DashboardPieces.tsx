@@ -1,4 +1,4 @@
-// @ts-nocheck -- ported as-is from the original PADHMATE JavaScript source.
+// @ts-nocheck -- ported as-is from the original PathshalaX JavaScript source.
 import React from 'react';
 import Icon from '../icons';
 import { QUESTIONS, TOTAL_QUESTIONS, isAnswered } from './surveyConfig';
@@ -11,7 +11,7 @@ export function ProfileNudge({ status, answers, onOpen, onDismiss }) {
   return (
     <aside className="sv-nudge" aria-label="Learning profile reminder">
       <Icon name="sparkle" size={22} />
-      <p>{started ? `Your learning profile is ${answered} of ${TOTAL_QUESTIONS} answered.` : 'Finish your learning profile so PADHMATE can adapt to how you learn.'}</p>
+      <p>{started ? `Your learning profile is ${answered} of ${TOTAL_QUESTIONS} answered.` : 'Finish your learning profile so PathshalaX can adapt to how you learn.'}</p>
       <div className="nudge-actions">
         <button type="button" className="chip-btn rip" onClick={onOpen}>{started ? 'Continue' : 'Complete profile'}</button>
         <button type="button" className="text-btn" onClick={onDismiss}>Not now</button>
@@ -37,7 +37,7 @@ export function ProfilePlan({ profile }) {
   return <div className="sv-plan">{chips.map((c) => <span key={c.label}>{c.label}: {c.value}</span>)}</div>;
 }
 
-/** Shown on My Progress: what PADHMATE knows, plus a way to change it. */
+/** Shown on My Progress: what PathshalaX knows, plus a way to change it. */
 export function ProfileCard({ status, profile, onOpen }) {
   const highlights = profileHighlights(profile);
   return (
@@ -50,7 +50,7 @@ export function ProfileCard({ status, profile, onOpen }) {
       </div>
       {status === 'completed' && highlights.length > 0
         ? <ul className="sv-chips">{highlights.map((h) => <li key={h}>{h}</li>)}</ul>
-        : <p className="muted">Answer a few questions about how you learn and PADHMATE will adapt hints, practice and revision to you.</p>}
+        : <p className="muted">Answer a few questions about how you learn and PathshalaX will adapt hints, practice and revision to you.</p>}
       {status === 'completed' && <p className="sv-tip">Your preferences are never locked. Change them whenever your way of studying changes.</p>}
     </section>
   );

@@ -1,4 +1,4 @@
-// Lovable Cloud adapter for PADHMATE (replaces the original Firebase setup).
+// Lovable Cloud adapter for PathshalaX (replaces the original Firebase setup).
 // Sign-in: Google and guest (anonymous) accounts. Data: user_progress and learning_profiles,
 // each readable and writable only by its owner.
 import type { User } from "@supabase/supabase-js";
@@ -60,7 +60,7 @@ export async function claimImportedAccount() {
     if (error) throw error;
     return data as string;
   } catch (error) {
-    console.error("Could not check for an imported PADHMATE account:", error);
+    console.error("Could not check for an imported PathshalaX account:", error);
     return "error";
   }
 }
@@ -110,5 +110,49 @@ export async function saveLearningProfile(
   const { error } = await supabase
     .from("learning_profiles")
     .upsert(payload as never, { onConflict: "user_id" });
+  if (error) throw error;
+}
+
+export type StudentSettings = {
+  displayName: string;
+  avatar: string;
+  classLevel: number;
+  subjects: string[];
+  dailyGoal: number;
+  theme: string | null;
+};
+
+export async function loadSettings(uid: string): Promise<StudentSettings | null> {
+  const { data, error } = await supabase
+    .from("student_settings")
+    .select("display_name, avatar, class_level, subjects, daily_goal, theme")
+    .eq("user_id", uid)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    displayName: data.display_name,
+    avatar: data.avatar,
+    classLevel: data.class_level,
+    subjects: data.subjects ?? [],
+    dailyGoal: data.daily_goal,
+    theme: data.theme,
+  };
+}
+
+export async function saveSettings(uid: string, s: StudentSettings) {
+  const { error } = await supabase.from("student_settings").upsert(
+    {
+      user_id: uid,
+      display_name: s.displayName.trim().slice(0, 40),
+      avatar: s.avatar,
+      class_level: s.classLevel,
+      subjects: s.subjects,
+      daily_goal: s.dailyGoal,
+      theme: s.theme,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
   if (error) throw error;
 }

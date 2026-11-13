@@ -1,4 +1,4 @@
-// @ts-nocheck -- ported as-is from the original PADHMATE JavaScript source.
+// @ts-nocheck -- ported as-is from the original PathshalaX JavaScript source.
 import React, { useEffect, useMemo, useState } from 'react';
 import { assessmentQuestionIds, lessons, questions } from './data';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,6 +7,12 @@ import {
   signInWithGoogle, signOutUser, toAppUser
 } from './cloud';
 import { stashGuestPersonalization } from './survey/personalizationService';
+import { loadSettings, saveSettings } from './cloud';
+import Setup, { defaultSettings } from './Setup';
+import LearnHub from './LearnHub';
+import PlayHub from './PlayHub';
+import { subjectsFor } from './curriculum';
+import { addDailyXp, streakDays, todayXp } from './streak';
 import Icon from './icons';
 import Parabola from './Parabola';
 import { Backdrop, Count, Dock, GoogleG, LogoMark, XpChip } from './ui';
@@ -28,8 +34,15 @@ const initialProgress = {
   revisionItems: [],
   xp: 0,
   assessmentCount: 0,
-  bestAssessment: null
+  bestAssessment: null,
+  completedChapters: [],
+  dailyXp: {}
 };
+
+// Adds learning points and records them against today's daily goal.
+function xpPatch(previous, points) {
+  return { xp: (previous.xp || 0) + points, dailyXp: addDailyXp(previous.dailyXp, points) };
+}
 
 function readProgress() {
   try {
@@ -40,7 +53,9 @@ function readProgress() {
       ...saved,
       completedLessons: Array.isArray(saved.completedLessons) ? saved.completedLessons : [],
       attempts: Array.isArray(saved.attempts) ? saved.attempts : [],
-      revisionItems: Array.isArray(saved.revisionItems) ? saved.revisionItems : []
+      revisionItems: Array.isArray(saved.revisionItems) ? saved.revisionItems : [],
+      completedChapters: Array.isArray(saved.completedChapters) ? saved.completedChapters : [],
+      dailyXp: saved.dailyXp && typeof saved.dailyXp === 'object' ? saved.dailyXp : {}
     };
   } catch {
     return initialProgress;
@@ -65,7 +80,7 @@ function getLessonForQuestion(questionId) {
   return lessons.find((lesson) => lesson.id === q?.lessonId) || lessons[0];
 }
 
-function updateRevisionQueue(queue, questionId, correct) {
+function updateRevisionQueue(queue, questionId, correct, snapshot = null) {
   const existing = queue.find((item) => item.questionId === questionId);
   if (correct) {
     return queue.filter((item) => item.questionId !== questionId);
@@ -75,7 +90,7 @@ function updateRevisionQueue(queue, questionId, correct) {
       ? { ...item, mistakes: existing.mistakes + 1, dueAt: Date.now(), reviewedAt: null }
       : item);
   }
-  return [...queue, { questionId, mistakes: 1, dueAt: Date.now(), reviewedAt: null }];
+  return [...queue, { questionId, mistakes: 1, dueAt: Date.now(), reviewedAt: null, ...(snapshot ? { snapshot } : {}) }];
 }
 
 function recordOneAttempt(previous, question, selected, source = 'practice') {
@@ -93,7 +108,25 @@ function recordOneAttempt(previous, question, selected, source = 'practice') {
     ...previous,
     attempts: [...previous.attempts, attempt],
     revisionItems: updateRevisionQueue(previous.revisionItems, question.id, correct),
-    xp: previous.xp + (correct ? 5 : 1)
+    ...xpPatch(previous, correct ? 5 : 1)
+  };
+}
+
+// Records an answer from an AI chapter quiz; the question text travels with it so Revision can show it.
+function recordChapterAttempt(previous, snapshot, correct) {
+  const attempt = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    questionId: snapshot.id,
+    topic: snapshot.topic,
+    correct,
+    source: 'chapter',
+    createdAt: Date.now()
+  };
+  return {
+    ...previous,
+    attempts: [...previous.attempts, attempt],
+    revisionItems: updateRevisionQueue(previous.revisionItems, snapshot.id, correct, snapshot),
+    ...xpPatch(previous, correct ? 5 : 1)
   };
 }
 
@@ -139,7 +172,7 @@ function App() {
     supabase.auth.getSession()
       .then(({ data: { session } }) => apply(session))
       .catch((error) => {
-        console.error('Could not restore the PADHMATE session:', error);
+        console.error('Could not restore the PathshalaX session:', error);
         if (active) { setAuthError(authMessage(error)); setAuthLoading(false); }
       });
     return () => {
@@ -153,13 +186,13 @@ function App() {
     async function loadCloudProgress() {
       if (!user) { setCloudReadyFor(null); return; }
       try {
-        // Google accounts from the previous PADHMATE app pick up their imported progress here.
+        // Google accounts from the previous PathshalaX app pick up their imported progress here.
         if (!user.isAnonymous) await claimImportedAccount();
         if (!active) return;
         const saved = await loadProgress(user.uid);
         if (!active) return;
         if (saved && Object.keys(saved).length) {
-          setProgress({ ...initialProgress, ...saved });
+          setProgress({ ...initialProgress, ...saved, completedChapters: saved.completedChapters || [], dailyXp: saved.dailyXp || {} });
         } else {
           // First sign-in: migrate this browser's existing progress (including a guest's) to the account.
           const local = readProgress();
@@ -168,7 +201,7 @@ function App() {
         }
         if (active) setCloudReadyFor(user.uid);
       } catch (error) {
-        console.error('Could not load PADHMATE cloud progress:', error);
+        console.error('Could not load PathshalaX cloud progress:', error);
         if (active) {
           setAuthError('Could not load cloud progress. Check your connection, then refresh.');
           setCloudReadyFor(user.uid);
@@ -186,7 +219,7 @@ function App() {
         await saveProgress(user.uid, progress);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
       } catch (error) {
-        console.error('Could not save PADHMATE cloud progress:', error);
+        console.error('Could not save PathshalaX cloud progress:', error);
         setAuthError('Cloud save failed. Your current session is still active; check your connection.');
       }
     };
@@ -226,14 +259,51 @@ function App() {
   const [showFullExplanation, setShowFullExplanation] = useState(false);
   const profile = pz.profile;
 
+  // Student preferences (name, avatar, class, subjects, daily goal, theme).
+  const [settings, setSettings] = useState(null);
+  const [settingsFor, setSettingsFor] = useState(null);
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [themePreview, setThemePreview] = useState(undefined);
+  useEffect(() => {
+    let active = true;
+    if (!user || !cloudReady) return undefined;
+    loadSettings(user.uid)
+      .then((loaded) => { if (active) { setSettings(loaded); setSettingsFor(user.uid); } })
+      .catch((error) => {
+        console.error('Could not load preferences:', error);
+        if (active) { setSettings(null); setSettingsFor(user.uid); setAuthError('Could not load your preferences. Check your connection.'); }
+      });
+    return () => { active = false; };
+  }, [user?.uid, cloudReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function storeSettings(next) {
+    await saveSettings(user.uid, next);
+    setSettings(next);
+    setEditingSettings(false);
+    setThemePreview(undefined);
+  }
+
   useEffect(() => { setThemeOverride(user ? readThemeOverride(user.uid) : null); setNudgeHidden(false); setSurveyMode(null); }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
   // Keep the survey on screen once it has started, even though autosave changes the stored status.
   useEffect(() => { if (user && pz.loaded && pz.status === 'none' && !surveyMode) setSurveyMode('first'); }, [user, pz.loaded, pz.status, surveyMode]);
-  const activeTheme = user ? resolveTheme(pz.themeProfile, themeOverride) : 'light';
+  const chosenTheme = themePreview !== undefined ? themePreview : settings?.theme;
+  const activeTheme = user ? (chosenTheme || resolveTheme(pz.themeProfile, themeOverride)) : 'light';
   useEffect(() => { applyTheme(activeTheme); }, [activeTheme]);
   function chooseTheme(theme) { setThemeOverride(theme); if (user) writeThemeOverride(user.uid, theme); }
 
   const [page, setPage] = useState('Overview');
+  const [learnSubject, setLearnSubject] = useState(null);
+  const [learnChapter, setLearnChapter] = useState(null);
+  const [gameId, setGameId] = useState(null);
+  function openChapter(subjectName, chapterId) { setLearnSubject(subjectName); setLearnChapter(chapterId); setPage('Learn'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function openGame(id) { setGameId(id); setPage('Play'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function earnXp(points) { setProgress((previous) => ({ ...previous, ...xpPatch(previous, points) })); }
+  function completeChapter(chapterId, event) {
+    if (event && !progress.completedChapters.includes(chapterId)) burstFrom(event, { count: 48, power: 11 });
+    setProgress((previous) => previous.completedChapters.includes(chapterId)
+      ? previous
+      : { ...previous, completedChapters: [...previous.completedChapters, chapterId], ...xpPatch(previous, 25) });
+  }
+  function chapterAttempt(snapshot, correct) { setProgress((previous) => recordChapterAttempt(previous, snapshot, correct)); }
   const [activeLessonId, setActiveLessonId] = useState('foundations');
   const [practiceIndex, setPracticeIndex] = useState(0);
   const [practiceSelected, setPracticeSelected] = useState(null);
@@ -266,7 +336,7 @@ function App() {
 
   const weakestTopic = topicSummary.find(([, data]) => data.incorrect > 0)?.[0];
   const baseCoachMessage = totalAttempts === 0
-    ? 'Start with the first lesson, then try a few practice questions. PADHMATE will use your answers to suggest what to revise.'
+    ? 'Start with the first lesson, then try a few practice questions. PathshalaX will use your answers to suggest what to revise.'
     : weakestTopic
       ? `Your attempts show more errors in ${weakestTopic.toLowerCase()}. Revisit the linked concept, then try a fresh question.`
       : 'Good foundation so far. Keep practising across different skills so your understanding stays balanced.';
@@ -274,6 +344,8 @@ function App() {
 
   function navigate(nextPage) {
     setPage(nextPage);
+    if (nextPage === 'Learn') { setLearnChapter(null); }
+    if (nextPage === 'Play') setGameId(null);
     if (nextPage === 'Practice') {
       setPracticeIndex(0);
       setPracticeSelected(null);
@@ -295,7 +367,7 @@ function App() {
       return {
         ...previous,
         completedLessons: [...previous.completedLessons, lessonId],
-        xp: previous.xp + 25
+        ...xpPatch(previous, 25)
       };
     });
   }
@@ -332,7 +404,7 @@ function App() {
       });
       return {
         ...updated,
-        xp: updated.xp + score * 3,
+        ...xpPatch(updated, score * 3),
         bestAssessment: Math.max(previous.bestAssessment ?? 0, Math.round((score / assessmentQuestions.length) * 100))
       };
     });
@@ -349,15 +421,16 @@ function App() {
   }
 
   function resetProgress() {
-    const confirmed = window.confirm('Reset all PADHMATE progress on this browser? This cannot be undone.');
+    const confirmed = window.confirm('Reset all your PathshalaX progress? This cannot be undone.');
     if (!confirmed) return;
-    setProgress({ ...initialProgress, completedLessons: [], attempts: [], revisionItems: [] });
+    setProgress({ ...initialProgress, completedLessons: [], attempts: [], revisionItems: [], completedChapters: [], dailyXp: {} });
     setPage('Overview');
   }
 
   const navItems = [
     { name: 'Overview', icon: 'home' },
     { name: 'Learn', icon: 'learn' },
+    { name: 'Play', icon: 'play' },
     { name: 'Practice', icon: 'practice' },
     { name: 'Revision', icon: 'revision' },
     { name: 'Assessment', icon: 'assess' },
@@ -379,8 +452,8 @@ function App() {
           <p className="auth-foot">A little progress every day adds up.</p>
         </section>
         <section className="auth-show">
-          <h1>Class 10 maths, one step at a time.</h1>
-          <p>Short lessons, practice that explains your mistakes, and a revision list that remembers for you.</p>
+          <h1>Classes 6–12, one step at a time.</h1>
+          <p>Every NCERT chapter with short notes and quizzes, study games that make ideas click, and a revision list that remembers for you.</p>
           <div className="plot-frame tilt"><Parabola tone="light" /></div>
         </section>
       </div>
@@ -390,7 +463,7 @@ function App() {
   if (authLoading) {
     return authLayout(
       <>
-        <div className="card-brand"><LogoMark /><span>PADHMATE</span></div>
+        <div className="card-brand"><LogoMark /><span>PathshalaX</span></div>
         <h2>Opening your study space</h2>
         <p>Checking your sign-in. This only takes a moment.</p>
         <div className="loadbar"><span /></div>
@@ -401,7 +474,7 @@ function App() {
   if (!user) {
     return authLayout(
       <>
-        <div className="card-brand"><LogoMark /><span>PADHMATE</span></div>
+        <div className="card-brand"><LogoMark /><span>PathshalaX</span></div>
         <h2>Welcome back.</h2>
         <p>Sign in to pick up where you left off. Your progress stays connected to your account.</p>
         <button className="btn btn-google magnetic" onClick={continueWithGoogle} disabled={authBusy}>
@@ -420,7 +493,7 @@ function App() {
   if (!pz.loaded) {
     return authLayout(
       <>
-        <div className="card-brand"><LogoMark /><span>PADHMATE</span></div>
+        <div className="card-brand"><LogoMark /><span>PathshalaX</span></div>
         <h2>Setting up your study space</h2>
         <p>Loading your learning profile.</p>
         <div className="loadbar"><span /></div>
@@ -428,6 +501,34 @@ function App() {
       </>
     );
   }
+
+  if (settingsFor !== user.uid) {
+    return authLayout(
+      <>
+        <div className="card-brand"><LogoMark /><span>PathshalaX</span></div>
+        <h2>Setting up your study space</h2>
+        <p>Loading your preferences.</p>
+        <div className="loadbar"><span /></div>
+      </>
+    );
+  }
+  if (!settings || editingSettings) {
+    return (
+      <Setup
+        key={editingSettings ? 'edit' : 'first'}
+        mode={settings ? 'edit' : 'first'}
+        initial={settings || defaultSettings(user.isAnonymous ? '' : (user.displayName || '').split(' ')[0])}
+        onSave={storeSettings}
+        onCancel={settings ? () => { setEditingSettings(false); setThemePreview(undefined); } : undefined}
+        onPreviewTheme={setThemePreview}
+      />
+    );
+  }
+  const studentName = settings.displayName || (user.isAnonymous ? 'Guest' : (user.displayName || 'Student'));
+  const mySubjects = subjectsFor(settings.classLevel).filter((s) => settings.subjects.includes(s.name));
+  const streak = streakDays(progress.dailyXp, settings.dailyGoal);
+  const today = todayXp(progress.dailyXp);
+  const goalPct = Math.min(100, Math.round((today / settings.dailyGoal) * 100));
 
   const activeSurvey = surveyMode || (pz.status === 'none' ? 'first' : null);
   if (activeSurvey) {
@@ -457,15 +558,16 @@ function App() {
       <header className="topbar">
         <div className="brand">
           <LogoMark />
-          <div><b>PADHMATE</b><small>Class 10 Mathematics</small></div>
+          <div><b>PathshalaX</b><small>Class {settings.classLevel} · {mySubjects.length} {mySubjects.length === 1 ? 'subject' : 'subjects'}</small></div>
         </div>
         <div className="topbar-right">
           {profile?.themeSwitchable && <ThemeSwitch value={activeTheme} onChange={chooseTheme} />}
+          <span className={`streak-chip ${today >= settings.dailyGoal ? 'lit' : ''}`} title={`Daily goal: ${today}/${settings.dailyGoal} XP today`}>🔥 <b>{streak}</b></span>
           <XpChip xp={progress.xp} />
-          <span className="account-label">{user.isAnonymous ? 'Guest account' : (user.displayName || user.email || 'Google account')}</span>
+          <span className="account-label">{studentName}{user.isAnonymous ? ' · Guest' : ''}</span>
           {user.isAnonymous && <button className="chip-btn rip" onClick={continueWithGoogle}><Icon name="link" size={15} />Link Google</button>}
           <button className="chip-btn rip" onClick={logOut}><Icon name="logout" size={15} />Sign out</button>
-          <div className="avatar">{(user.displayName || 'G').slice(0, 1).toUpperCase()}</div>
+          <button type="button" className="avatar avatar-btn" onClick={() => setEditingSettings(true)} aria-label="Edit your profile and preferences">{settings.avatar}</button>
         </div>
       </header>
 
@@ -484,12 +586,12 @@ function App() {
             )}
             <section className="hero on-board">
               <div className="hero-copy">
-                <span className="pill"><span className="live-dot" />Quadratic equations</span>
-                <h1>Make quadratics make sense.</h1>
-                <p>Build a strong understanding with guided lessons, focused practice and feedback that helps you learn from mistakes.</p>
+                <span className="pill"><span className="live-dot" />{settings.avatar} Hi {studentName} · Class {settings.classLevel}</span>
+                <h1>Learning that feels like play.</h1>
+                <p>Every chapter of your NCERT books with short notes, worked examples and quizzes — plus games and animations that make ideas click.</p>
                 <div className="hero-actions">
                   <button className="btn btn-primary magnetic" onClick={() => navigate('Learn')}>Continue learning<Icon name="arrow" size={18} className="arr" /></button>
-                  <button className="btn btn-ghost magnetic" onClick={() => navigate('Practice')}>Try practice</button>
+                  <button className="btn btn-ghost magnetic" onClick={() => navigate('Play')}>Play a study game</button>
                 </div>
               </div>
               <Parabola tone="dark" />
@@ -497,26 +599,26 @@ function App() {
 
             <section className="scoreboard" aria-label="Your numbers">
               <div className="score"><Icon name="bolt" size={22} /><b><Count value={progress.xp} /></b><span>Learning points</span></div>
-              <div className="score"><Icon name="learn" size={22} /><b><Count value={progress.completedLessons.length} />/{lessons.length}</b><span>Lessons completed</span></div>
-              <div className="score"><Icon name="target" size={22} /><b><Count value={accuracy} suffix="%" /></b><span>Overall accuracy</span></div>
+              <div className="score"><span className="score-emoji" aria-hidden="true">🔥</span><b><Count value={streak} /></b><span>{streak === 1 ? 'Day streak' : 'Days streak'}</span></div>
+              <div className="score goal-score"><Icon name="target" size={22} /><b><Count value={today} />/{settings.dailyGoal}</b><span>Today’s goal (XP)</span><div className="bar"><span style={{ width: `${goalPct}%` }} /></div></div>
               <div className="score"><Icon name="revision" size={22} /><b><Count value={dueRevisionItems.length} /></b><span>Revision to do</span></div>
             </section>
 
             <div className="overview-grid">
               <section className="panel journey-panel">
                 <div className="panel-head">
-                  <h2>Chapter journey</h2>
-                  <button className="text-btn" onClick={() => navigate('Learn')}>Open lessons<Icon name="arrow" size={16} className="arr" /></button>
+                  <h2>Your subjects</h2>
+                  <button className="text-btn" onClick={() => setEditingSettings(true)}>Change subjects<Icon name="arrow" size={16} className="arr" /></button>
                 </div>
                 <div className="journey">
-                  {lessons.map((lesson, index) => {
-                    const done = progress.completedLessons.includes(lesson.id);
-                    const next = !done && index === progress.completedLessons.length;
+                  {mySubjects.map((subject) => {
+                    const done = subject.chapters.filter((c) => progress.completedChapters.includes(c.id)).length;
+                    const next = subject.chapters.find((c) => !progress.completedChapters.includes(c.id));
                     return (
-                      <button key={lesson.id} className={`journey-row rip ${done ? 'is-done' : ''} ${next ? 'is-next' : ''}`} onClick={() => { setActiveLessonId(lesson.id); navigate('Learn'); }}>
-                        <span className="node">{done ? <Icon name="check" size={18} strokeWidth={3} /> : lesson.number}</span>
-                        <span className="journey-text"><strong>{lesson.shortTitle}</strong><small>{lesson.duration} · {lesson.level}</small></span>
-                        <span className="status">{done ? 'Completed' : next ? 'Up next' : 'To do'}</span>
+                      <button key={subject.id} className={`journey-row rip ${done === subject.chapters.length ? 'is-done' : ''}`} onClick={() => openChapter(subject.name, null)}>
+                        <span className="node subject-node" aria-hidden="true">{subject.icon}</span>
+                        <span className="journey-text"><strong>{subject.name}</strong><small>{next ? `Next: ${next.title}` : 'All chapters done'}</small></span>
+                        <span className="status">{done}/{subject.chapters.length}</span>
                         <Icon name="arrow" size={18} className="arr" />
                       </button>
                     );
@@ -528,8 +630,8 @@ function App() {
                 <span className="sticky-icon"><Icon name="sparkle" size={22} /></span>
                 <h2>Your next step</h2>
                 <p>{coachMessage}</p>
-                <button className="btn btn-dark magnetic" onClick={() => { if (weakestTopic) { const q = questions.find((item) => item.topic === weakestTopic); setActiveLessonId(q?.lessonId || 'foundations'); navigate('Learn'); } else navigate(profile?.startWith === 'practice' ? 'Practice' : 'Learn'); }}>
-                  {weakestTopic ? `Revisit ${weakestTopic}` : profile?.startWith === 'practice' ? 'Try a practice question' : 'Start the first lesson'}<Icon name="arrow" size={18} className="arr" />
+                <button className="btn btn-dark magnetic" onClick={() => { if (weakestTopic) { const q = questions.find((item) => item.topic === weakestTopic); if (q) { setActiveLessonId(q.lessonId); navigate('Quadratics'); } else { const item = progress.revisionItems.find((r) => r.snapshot?.topic === weakestTopic); if (item) openChapter(null, item.snapshot.chapterId); else navigate('Learn'); } } else navigate(profile?.startWith === 'practice' ? 'Play' : 'Learn'); }}>
+                  {weakestTopic ? `Revisit ${weakestTopic}` : profile?.startWith === 'practice' ? 'Play a study game' : 'Open my chapters'}<Icon name="arrow" size={18} className="arr" />
                 </button>
                 <ProfilePlan profile={profile} />
                 {sessionNudge(profile) && <small>{sessionNudge(profile)}</small>}
@@ -541,11 +643,11 @@ function App() {
               <h2>Jump to</h2>
               <div className="jump-grid">
                 {[
-                  { icon: 'sparkle', title: 'Gamified learning', text: 'Earn points as you complete lessons.', target: 'Learn' },
+                  { icon: 'play', title: 'Study games', text: 'Graphs, lenses, circuits, planets and history.', target: 'Play' },
+                  { icon: 'sparkle', title: 'Every chapter', text: 'Notes, examples and quizzes for each subject.', target: 'Learn' },
                   { icon: 'progress', title: 'Smart study insights', text: 'Get guidance from your learning activity.', target: 'My Progress' },
                   { icon: 'revision', title: 'Smart revision', text: 'Bring difficult concepts back into focus.', target: 'Revision' },
-                  { icon: 'practice', title: 'Question practice', text: 'Practise and understand every answer.', target: 'Practice' },
-                  { icon: 'assess', title: 'Tests and assessment', text: 'Check your chapter understanding.', target: 'Assessment' }
+                  { icon: 'practice', title: 'Quadratics practice', text: 'A full Class 10 practice set with feedback.', target: 'Practice' }
                 ].map((tile) => (
                   <button className="tile tilt rip" key={tile.title} onClick={() => navigate(tile.target)}>
                     <span className="tile-icon"><Icon name={tile.icon} size={24} /></span>
@@ -560,8 +662,24 @@ function App() {
         )}
 
         {page === 'Learn' && (
+          <LearnHub
+            settings={settings}
+            completed={progress.completedChapters}
+            subjectName={learnSubject}
+            chapterId={learnChapter}
+            onOpen={openChapter}
+            onComplete={completeChapter}
+            onAttempt={chapterAttempt}
+            onOpenSample={() => navigate('Quadratics')}
+            onOpenGame={openGame}
+          />
+        )}
+
+        {page === 'Play' && <PlayHub game={gameId} onOpen={(id) => { setGameId(id); window.scrollTo({ top: 0, behavior: 'smooth' }); }} onXp={earnXp} />}
+
+        {page === 'Quadratics' && (
           <>
-            <PageHead title="Learn at your pace." description="Work through each concept in order. Complete a lesson when you understand it, not just when you have opened it." />
+            <PageHead title="Quadratic equations, step by step." description="Class 10 Mathematics · five interactive lessons. Complete a lesson when you understand it, not just when you have opened it." action={<button className="chip-btn rip" onClick={() => openChapter('Mathematics', null)}><Icon name="learn" size={15} />All Maths chapters</button>} />
             <div className="learn">
               <aside className="toc panel">
                 <div className="toc-head"><strong>Chapter content</strong><span className="count-chip">{progress.completedLessons.length}/{lessons.length} done</span></div>
@@ -621,7 +739,7 @@ function App() {
 
         {page === 'Practice' && (
           <>
-            <PageHead title="Learn by doing." description="Choose an answer, submit it and understand the thinking behind the result. Incorrect attempts are added to your revision list." />
+            <PageHead title="Learn by doing." description="Class 10 Maths · Quadratic equations practice set. Choose an answer, submit it and understand the thinking behind the result. Every chapter in Learn also has its own quiz." />
             {practiceFinished ? (
               <section className="panel done-panel">
                 <div className="done-symbol"><Icon name="check" size={44} strokeWidth={3} /></div>
@@ -678,7 +796,7 @@ function App() {
                   <div className="sticky tip tilt">
                     <Icon name="sparkle" size={22} />
                     <h3>{practiceTip(profile)?.title || 'Understand the why.'}</h3>
-                    <p>{practiceTip(profile)?.text || 'When an answer is incorrect, PADHMATE shows a possible concept gap and a short explanation. One response is a clue, not a final judgement of your ability.'}</p>
+                    <p>{practiceTip(profile)?.text || 'When an answer is incorrect, PathshalaX shows a possible concept gap and a short explanation. One response is a clue, not a final judgement of your ability.'}</p>
                   </div>
                   <div className="panel side-stats">
                     <h3>Your chapter activity</h3>
@@ -709,7 +827,7 @@ function App() {
             ) : (
               <div className="rev-list">
                 {progress.revisionItems.map((item, index) => {
-                  const question = questions.find((q) => q.id === item.questionId);
+                  const question = questions.find((q) => q.id === item.questionId) || (item.snapshot ? { prompt: item.snapshot.prompt, topic: item.snapshot.topic } : null);
                   const lesson = getLessonForQuestion(item.questionId);
                   const isDue = item.dueAt <= Date.now();
                   if (!question) return null;
@@ -719,7 +837,7 @@ function App() {
                       <h3>{question.prompt}</h3>
                       <p className="muted">Added after {item.mistakes} incorrect {item.mistakes === 1 ? 'attempt' : 'attempts'}. Revisit the lesson before trying the question again.</p>
                       <div className="actions-row">
-                        <button className="btn btn-soft magnetic" onClick={() => { setActiveLessonId(lesson.id); navigate('Learn'); }}>Revisit lesson<Icon name="arrow" size={18} className="arr" /></button>
+                        <button className="btn btn-soft magnetic" onClick={() => { if (item.snapshot) openChapter(null, item.snapshot.chapterId); else { setActiveLessonId(lesson.id); navigate('Quadratics'); } }}>Revisit lesson<Icon name="arrow" size={18} className="arr" /></button>
                         <button className="text-btn" disabled={!isDue} onClick={() => markRevisionReviewed(item.questionId)}><Icon name="check" size={16} strokeWidth={3} />Mark reviewed for today</button>
                       </div>
                     </section>
@@ -732,12 +850,12 @@ function App() {
 
         {page === 'Assessment' && (
           <>
-            <PageHead title="Check what you know." description="A short chapter assessment with no hints during the attempt. Your result is saved to your learning record." />
+            <PageHead title="Check what you know." description="Class 10 Maths · Quadratic equations chapter test with no hints during the attempt. Your result is saved to your learning record." />
             {!assessmentStarted ? (
               <section className="panel exam-intro">
                 <div className="sheet-stack tilt" aria-hidden="true">
                   <div className="sheet s3" /><div className="sheet s2" />
-                  <div className="sheet s1"><small>PADHMATE</small><strong>Chapter<br />assessment</strong><em>{assessmentQuestions.length} questions</em><Icon name="check" size={34} strokeWidth={3} /></div>
+                  <div className="sheet s1"><small>PathshalaX</small><strong>Chapter<br />assessment</strong><em>{assessmentQuestions.length} questions</em><Icon name="check" size={34} strokeWidth={3} /></div>
                 </div>
                 <div className="exam-copy">
                   <h2>Ready to check your understanding?</h2>
@@ -820,7 +938,7 @@ function App() {
             </section>
             <div className="progress-grid">
               <section className="panel">
-                <div className="panel-head"><h2>Your skill map</h2><span className="count-chip">{progress.completedLessons.length}/{lessons.length} lessons</span></div>
+                <div className="panel-head"><h2>Quadratics skill map</h2><span className="count-chip">{progress.completedLessons.length}/{lessons.length} lessons</span></div>
                 {lessons.map((lesson, index) => {
                   const related = progress.attempts.filter((attempt) => questions.find((q) => q.id === attempt.questionId)?.lessonId === lesson.id);
                   const right = related.filter((attempt) => attempt.correct).length;
@@ -848,6 +966,30 @@ function App() {
                 <div className="best"><span>Best assessment score</span><b>{progress.bestAssessment === null ? '—' : <Count value={progress.bestAssessment} suffix="%" />}</b></div>
               </section>
             </div>
+            <section className="panel prefs-card">
+              <div className="panel-head">
+                <h2>{settings.avatar} {studentName}</h2>
+                <button type="button" className="chip-btn rip" onClick={() => setEditingSettings(true)}><Icon name="practice" size={15} />Edit profile and preferences</button>
+              </div>
+              <ul className="sv-chips">
+                <li>Class {settings.classLevel}</li>
+                <li>Daily goal: {settings.dailyGoal} XP</li>
+                <li>Theme: {settings.theme ? settings.theme[0].toUpperCase() + settings.theme.slice(1) : 'From learning profile'}</li>
+                <li>🔥 {streak}-day streak</li>
+              </ul>
+              <div className="subject-progress">
+                {mySubjects.map((subject) => {
+                  const done = subject.chapters.filter((c) => progress.completedChapters.includes(c.id)).length;
+                  const pct = Math.round((done / subject.chapters.length) * 100);
+                  return (
+                    <button type="button" key={subject.id} className="skill subject-skill" onClick={() => openChapter(subject.name, null)}>
+                      <div className="skill-top"><div><strong>{subject.icon} {subject.name}</strong><small>{done} of {subject.chapters.length} chapters completed</small></div><b>{pct}%</b></div>
+                      <div className="bar"><span style={{ width: `${pct}%` }} /></div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
             <ProfileCard status={pz.status} profile={profile} onOpen={() => setSurveyMode(pz.status === 'completed' ? 'edit' : pz.status === 'in_progress' ? 'resume' : 'first')} />
             <section className="panel history">
               <div className="panel-head"><h2>Your learning history</h2></div>
@@ -858,7 +1000,7 @@ function App() {
                   return (
                     <div className="history-row" key={attempt.id} style={{ '--i': index }}>
                       <span className={`mark ${attempt.correct ? 'right' : 'wrong'}`}><Icon name={attempt.correct ? 'check' : 'close'} size={16} strokeWidth={3} /></span>
-                      <div><strong>{question?.topic || attempt.topic}</strong><small>{attempt.source === 'assessment' ? 'Assessment' : 'Practice'} · {formatDate(attempt.createdAt)}</small></div>
+                      <div><strong>{question?.topic || attempt.topic}</strong><small>{attempt.source === 'assessment' ? 'Assessment' : attempt.source === 'chapter' ? 'Chapter quiz' : 'Practice'} · {formatDate(attempt.createdAt)}</small></div>
                       <span className={`tag ${attempt.correct ? 'good' : 'warn'}`}>{attempt.correct ? 'Correct' : 'Review needed'}</span>
                     </div>
                   );
@@ -868,7 +1010,7 @@ function App() {
         )}
       </main>
 
-      <Dock items={navItems} page={page} onNavigate={navigate} dueCount={dueRevisionItems.length} />
+      <Dock items={navItems} page={page === 'Quadratics' ? 'Learn' : page} onNavigate={navigate} dueCount={dueRevisionItems.length} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
-// @ts-nocheck -- ported as-is from the original PADHMATE JavaScript source.
-// PADHMATE Student Personalization Survey: question model.
+// @ts-nocheck -- ported as-is from the original PathshalaX JavaScript source.
+// PathshalaX Student Personalization Survey: question model.
 // Every question declares where its answer lives in the stored profile document (`path`),
 // so the UI, validation, review screen and persistence all read from this one list.
 
@@ -14,7 +14,7 @@ export const PARTS = [
     id: 'thinking',
     number: 3,
     title: 'Understanding how you think',
-    blurb: 'There are no right or wrong answers here. This is how PADHMATE learns your natural problem-solving style.'
+    blurb: 'There are no right or wrong answers here. This is how PathshalaX learns your natural problem-solving style.'
   }
 ];
 
@@ -181,7 +181,7 @@ export const QUESTIONS = [
   {
     key: 'notes', number: 15, part: 'thinking', type: 'text', required: false,
     path: ['additionalNotes'],
-    title: 'Is there anything else PADHMATE should know about your learning habits?',
+    title: 'Is there anything else PathshalaX should know about your learning habits?',
     hint: 'Optional.',
     placeholder: 'Tell us anything about how you study, what frustrates you, or what helps you learn...',
     maxLength: 600

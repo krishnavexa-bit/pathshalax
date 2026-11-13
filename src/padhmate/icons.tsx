@@ -1,4 +1,4 @@
-// @ts-nocheck -- ported as-is from the original PADHMATE JavaScript source.
+// @ts-nocheck -- ported as-is from the original PathshalaX JavaScript source.
 import React from 'react';
 
 const paths = {
@@ -18,6 +18,7 @@ const paths = {
   target: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r=".8" /></>,
   bolt: <path d="M13 3 5.5 13.5H11L10 21l7.5-10.5H12z" />,
   trophy: <><path d="M8 4.5h8v5a4 4 0 0 1-8 0z" /><path d="M8 6H4.5v1.5A3.5 3.5 0 0 0 8 11" /><path d="M16 6h3.5v1.5A3.5 3.5 0 0 1 16 11" /><path d="M12 13.5V17" /><path d="M8.5 20.5h7M10 17h4" /></>,
+  play: <><rect x="2.5" y="7" width="19" height="11" rx="5.5" /><path d="M7.5 10.5v4M5.5 12.5h4" /><circle cx="15.5" cy="11.5" r=".9" /><circle cx="17.8" cy="13.8" r=".9" /></>,
   trash: <><path d="M4.5 7h15" /><path d="M9.5 7V4.5h5V7" /><path d="M6.5 7l.8 12.5h9.4L17.5 7" /></>
 };
 

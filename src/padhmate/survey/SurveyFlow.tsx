@@ -1,4 +1,4 @@
-// @ts-nocheck -- ported as-is from the original PADHMATE JavaScript source.
+// @ts-nocheck -- ported as-is from the original PathshalaX JavaScript source.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../icons';
 import { Backdrop, LogoMark } from '../ui';
@@ -101,7 +101,7 @@ function answerText(question, answers) {
 function SurveyTopbar({ onLater, laterLabel, onSignOut }) {
   return (
     <header className="topbar">
-      <div className="brand"><LogoMark /><div><b>PADHMATE</b><small>Your learning profile</small></div></div>
+      <div className="brand"><LogoMark /><div><b>PathshalaX</b><small>Your learning profile</small></div></div>
       <div className="topbar-right">
         {onLater && <button type="button" className="chip-btn rip" onClick={onLater}>{laterLabel}</button>}
         {onSignOut && <button type="button" className="chip-btn rip" onClick={onSignOut}><Icon name="logout" size={15} />Sign out</button>}
@@ -227,9 +227,9 @@ export default function SurveyFlow({ mode, initialRecord, syncError, onAutosave,
         <SurveyTopbar onSignOut={onSignOut} />
         <main className="page sv-page">
           <section className={`panel sv-card sv-intro ${motionClass}`} key="intro" aria-labelledby="sv-title">
-            <span className="pill sv-pill"><span className="live-dot" />Welcome to PADHMATE</span>
+            <span className="pill sv-pill"><span className="live-dot" />Welcome to PathshalaX</span>
             <h1 id="sv-title" tabIndex={-1} ref={headingRef}>Let’s understand how you learn.</h1>
-            <p className="sv-lead">Everyone learns differently. Answer a few questions so PADHMATE can create a learning experience that works for you.</p>
+            <p className="sv-lead">Everyone learns differently. Answer a few questions so PathshalaX can create a learning experience that works for you.</p>
             <ul className="sv-facts">
               <li><Icon name="clock" size={20} /><span><b>About 7–10 minutes</b>{TOTAL_QUESTIONS} short questions in 3 parts</span></li>
               <li><Icon name="revision" size={20} /><span><b>Change it any time</b>Update your answers later from My Progress</span></li>
@@ -241,7 +241,7 @@ export default function SurveyFlow({ mode, initialRecord, syncError, onAutosave,
               </button>
               <button type="button" className="text-btn" onClick={onSkip}>I’ll do this later</button>
             </div>
-            <p className="save-note">You can use PADHMATE right away. We’ll remind you gently to finish your learning profile.</p>
+            <p className="save-note">You can use PathshalaX right away. We’ll remind you gently to finish your learning profile.</p>
           </section>
         </main>
       </div>
@@ -259,8 +259,8 @@ export default function SurveyFlow({ mode, initialRecord, syncError, onAutosave,
           <section className={`panel sv-card done-panel ${motionClass}`} key="success" aria-labelledby="sv-title">
             <div className="done-symbol"><Icon name="check" size={44} strokeWidth={3} /></div>
             <h2 id="sv-title" tabIndex={-1} ref={headingRef}>{editing ? 'Your profile is updated.' : 'Your learning profile is ready.'}</h2>
-            <p className="muted">PADHMATE will now adapt your dashboard, hints, practice and revision to the way you learn.</p>
-            {highlights.length > 0 && <ul className="sv-chips" aria-label="What PADHMATE learned about you">{highlights.map((h) => <li key={h}>{h}</li>)}</ul>}
+            <p className="muted">PathshalaX will now adapt your dashboard, hints, practice and revision to the way you learn.</p>
+            {highlights.length > 0 && <ul className="sv-chips" aria-label="What PathshalaX learned about you">{highlights.map((h) => <li key={h}>{h}</li>)}</ul>}
             <div className="actions-row center">
               <button type="button" className="btn btn-primary magnetic" onClick={onClose}>{editing ? 'Back to my progress' : 'Go to my dashboard'}<Icon name="arrow" size={18} className="arr" /></button>
             </div>
@@ -355,7 +355,7 @@ export default function SurveyFlow({ mode, initialRecord, syncError, onAutosave,
           )}
           {question.type === 'text' && (
             <label className="sv-field">
-              <span className="sv-sr">Anything else PADHMATE should know (optional)</span>
+              <span className="sv-sr">Anything else PathshalaX should know (optional)</span>
               <textarea rows={6} maxLength={question.maxLength} value={answers.notes} placeholder={question.placeholder} onChange={(e) => update({ notes: e.target.value })} />
               <small>{answers.notes.length}/{question.maxLength}</small>
             </label>

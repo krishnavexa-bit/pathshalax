@@ -1,4 +1,4 @@
-/* Survey screens. Built on the existing PADHMATE classes (.panel, .opt, .bar, .btn, .chip-btn). */
+/* Survey screens. Built on the existing PathshalaX classes (.panel, .opt, .bar, .btn, .chip-btn). */
 .sv-page { max-width: 860px; padding-bottom: 60px; }
 .sv-card { position: relative; }
 .sv-screen.sv-forward { animation: svForward 0.45s var(--ease); }

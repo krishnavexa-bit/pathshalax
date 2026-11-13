@@ -1,4 +1,4 @@
-// @ts-nocheck -- ported as-is from the original PADHMATE JavaScript source.
+// @ts-nocheck -- ported as-is from the original PathshalaX JavaScript source.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clearCachedPersonalization, emptyRecord, loadPersonalization, savePersonalization } from './personalizationService';
 import { deriveProfile } from './profile';

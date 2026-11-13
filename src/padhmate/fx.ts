@@ -1,5 +1,5 @@
-// @ts-nocheck -- ported as-is from the original PADHMATE JavaScript source.
-// PADHMATE motion engine: cursor light, magnetic buttons, tilt cards, click ripples, confetti.
+// @ts-nocheck -- ported as-is from the original PathshalaX JavaScript source.
+// PathshalaX motion engine: cursor light, magnetic buttons, tilt cards, click ripples, confetti.
 // Everything here is cosmetic and switches itself off for prefers-reduced-motion.
 
 const prefersReduced = () =>

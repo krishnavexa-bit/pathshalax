@@ -6,14 +6,15 @@
  *   src/routes/__root.tsx and name the family in a --font-* token in @theme inline below.
  */
 @layer theme, base, components, utilities;
-/* Tailwind without its preflight reset, so the original PADHMATE base styles render unchanged. */
+/* Tailwind without its preflight reset, so the original PathshalaX base styles render unchanged. */
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 @source "../src";
 @import "tw-animate-css";
-/* PADHMATE design (graph paper, chalkboard, live parabola) and the survey themes, carried over as-is. */
+/* PathshalaX design (graph paper, chalkboard, live parabola) and the survey themes, carried over as-is. */
 @import "./padhmate/padhmate.css";
 @import "./padhmate/survey/survey.css";
+@import "./padhmate/pathshalax.css";
 
 @custom-variant dark (&:is(.dark *));
 

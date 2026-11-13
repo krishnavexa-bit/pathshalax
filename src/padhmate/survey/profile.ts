@@ -1,6 +1,6 @@
-// @ts-nocheck -- ported as-is from the original PADHMATE JavaScript source.
+// @ts-nocheck -- ported as-is from the original PathshalaX JavaScript source.
 // Turns survey answers into (1) the stored profile document and (2) a derived learner profile
-// that the rest of PADHMATE reads to adapt itself.
+// that the rest of PathshalaX reads to adapt itself.
 import { QUESTIONS, SURVEY_VERSION, emptyAnswers, normaliseAnswers, questionByKey } from './surveyConfig';
 
 /* ---------- answers <-> stored profile document ---------- */
@@ -150,7 +150,7 @@ const STYLE_START = {
   interactive: 'Start with the first lesson, then play with the live parabola on this page to see how the curve reacts.',
   practice: 'Jump straight into a few practice questions. Each wrong answer shows you exactly which idea to revisit.',
   stepwise: 'Start with the first lesson and follow each numbered step in order. Finish one step before the next.',
-  mixed: 'Start with the first lesson, then try a few practice questions. PADHMATE will use your answers to suggest what to revise.'
+  mixed: 'Start with the first lesson, then try a few practice questions. PathshalaX will use your answers to suggest what to revise.'
 };
 
 export function coachMessage(profile, { hasAttempts, weakestTopic, fallback }) {

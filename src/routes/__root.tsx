@@ -81,16 +81,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "theme-color", content: "#f3f6ef" },
-      { title: "PADHMATE — Your Learning Companion" },
+      { title: "PathshalaX — Your Learning Companion" },
       {
         name: "description",
         content:
-          "PADHMATE — Your Learning Companion. A focused Class 10 Mathematics learning prototype.",
+          "PathshalaX — learning for Classes 6–12 with NCERT chapter notes, quizzes and study games.",
       },
-      { property: "og:title", content: "PADHMATE — Your Learning Companion" },
+      { property: "og:title", content: "PathshalaX — Your Learning Companion" },
       {
         property: "og:description",
-        content: "A focused Class 10 Mathematics learning prototype.",
+        content: "Learning for Classes 6–12 with NCERT chapter notes, quizzes and study games.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

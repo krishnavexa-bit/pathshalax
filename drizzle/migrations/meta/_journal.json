@@ -8,6 +8,13 @@
       "when": 1794572619934,
       "tag": "0000_padhmate_progress_and_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794573426704,
+      "tag": "0001_pathshalax_settings_and_lessons",
+      "breakpoints": true
     }
   ]
 }

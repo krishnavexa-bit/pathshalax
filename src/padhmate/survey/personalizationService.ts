@@ -1,4 +1,4 @@
-// @ts-nocheck -- ported from the original PADHMATE JavaScript source.
+// @ts-nocheck -- ported from the original PathshalaX JavaScript source.
 // Reads and writes the student's learning profile in Lovable Cloud (learning_profiles, owner-only).
 // A per-account copy is kept in localStorage so a flaky connection never loses a student's answers.
 import { loadLearningProfile, saveLearningProfile } from '../cloud';
@@ -63,7 +63,7 @@ export async function loadPersonalization(uid) {
     const local = cached || takeCarry();
     return local ? { record: local, source: 'cache', unsynced: true } : { record: emptyRecord(), source: 'none' };
   } catch (error) {
-    console.error('Could not load the PADHMATE learning profile:', error);
+    console.error('Could not load the PathshalaX learning profile:', error);
     return { record: cached || emptyRecord(), source: cached ? 'cache' : 'none', error };
   }
 }
