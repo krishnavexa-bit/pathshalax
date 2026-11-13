@@ -28,3 +28,10 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules
+
+- The PADHMATE study app lives in `src/padhmate/` as one client-only React app loaded by `src/routes/index.tsx` behind `ClientOnly`; it keeps its own page state (no extra routes) because it relies on browser-only APIs (session, localStorage, cursor effects).
+- Files in `src/padhmate/` ported from the original JavaScript keep `// @ts-nocheck`; new code there (e.g. `cloud.ts`) is typed. All backend access goes through `src/padhmate/cloud.ts`.
+- `src/styles.css` imports Tailwind without preflight so the original PADHMATE CSS (`padhmate.css`, `survey/survey.css`) renders unchanged.
+- Imported accounts from the previous app live in server-only `legacy_accounts` and are linked only by `claim_legacy_account()` (verified email, exactly one unclaimed match); never expose that table to clients.
