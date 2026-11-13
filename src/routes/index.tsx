@@ -1,23 +1,39 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
+import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 
-// The home route ships no og:image, so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
+// PADHMATE is a browser-only study app (sign-in session, local progress, cursor effects),
+// so it loads after hydration.
+const PadhmateApp = lazy(() => import("@/padhmate/App"));
+
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "PADHMATE — Your Learning Companion" },
+      {
+        name: "description",
+        content:
+          "PADHMATE — Your Learning Companion. Class 10 maths, one step at a time: quadratic equations lessons, practice and revision.",
+      },
+      { property: "og:title", content: "PADHMATE — Your Learning Companion" },
+      {
+        property: "og:description",
+        content:
+          "Short lessons, practice that explains your mistakes, and a revision list that remembers for you.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
+  const fallback = <div className="stage" aria-busy="true" />;
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <ClientOnly fallback={fallback}>
+      <Suspense fallback={fallback}>
+        <PadhmateApp />
+      </Suspense>
+    </ClientOnly>
   );
 }

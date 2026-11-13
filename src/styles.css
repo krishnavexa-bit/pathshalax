@@ -5,9 +5,15 @@
  *   build resolves @import from the filesystem. Load those with a <link> in the head() of
  *   src/routes/__root.tsx and name the family in a --font-* token in @theme inline below.
  */
-@import "tailwindcss" source(none);
+@layer theme, base, components, utilities;
+/* Tailwind without its preflight reset, so the original PADHMATE base styles render unchanged. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
 @source "../src";
 @import "tw-animate-css";
+/* PADHMATE design (graph paper, chalkboard, live parabola) and the survey themes, carried over as-is. */
+@import "./padhmate/padhmate.css";
+@import "./padhmate/survey/survey.css";
 
 @custom-variant dark (&:is(.dark *));
 

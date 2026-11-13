@@ -1,0 +1,20 @@
+{
+  "source": "code-archive: PADHMATE-Redesign-with-survey.zip (React 18 + Vite SPA, Firebase Auth + Firestore, Netlify)",
+  "capabilities": [
+    {"capability": "code", "source": "src/App.jsx, ui.jsx, Parabola.jsx, fx.js, icons.jsx, data.js, survey/*", "outcome": "migrate", "status": "pending", "next_action": "Port SPA into TanStack Start '/' route as a client-only app"},
+    {"capability": "styles-and-assets", "source": "src/styles.css, survey/survey.css, Google Fonts, public/favicon.svg", "outcome": "migrate", "status": "pending", "next_action": "Carry CSS, fonts and favicon over unchanged"},
+    {"capability": "schema", "source": "Firestore users/{uid}.progress and users/{uid}/profile/personalization", "outcome": "migrate", "status": "pending", "next_action": "Create user_progress and learning_profiles tables in Lovable Cloud"},
+    {"capability": "records", "source": "Firestore (padhmate-aeaad) — no export attached", "outcome": "migrate", "status": "pending", "next_action": "Request Firestore users export after preview; import into legacy_accounts"},
+    {"capability": "auth-identities", "source": "Firebase Auth: Google + Anonymous", "outcome": "migrate", "status": "pending", "next_action": "Replace with Lovable Cloud Google + anonymous guest sign-in; request Firebase Auth user export"},
+    {"capability": "identity-mapping", "source": "Firebase UID -> Lovable user", "outcome": "migrate", "status": "pending", "next_action": "legacy_accounts table + server-side claim on verified-email Google sign-in"},
+    {"capability": "authorization", "source": "firestore.rules: owner-only under users/{uid}/**", "outcome": "migrate", "status": "pending", "next_action": "Owner-only RLS on all user tables"},
+    {"capability": "guest-to-google-linking", "source": "linkWithPopup on anonymous user", "outcome": "migrate", "status": "pending", "next_action": "Carry guest progress into Google account after sign-in"},
+    {"capability": "local-progress-migration", "source": "localStorage progress copied to cloud on first sign-in", "outcome": "migrate", "status": "pending", "next_action": "Keep behaviour"},
+    {"capability": "uploaded-files", "source": "none (storageBucket configured but unused)", "outcome": "not-applicable", "status": "verified", "next_action": "none"},
+    {"capability": "public-endpoints-webhooks-schedules", "source": "none", "outcome": "not-applicable", "status": "verified", "next_action": "none"},
+    {"capability": "ai-payments-email-analytics", "source": "none (measurementId present but analytics SDK never initialised)", "outcome": "not-applicable", "status": "verified", "next_action": "none"},
+    {"capability": "secrets", "source": "Firebase web config only (public client config)", "outcome": "drop", "status": "verified", "next_action": "none — Firebase removed"},
+    {"capability": "hosting-cutover", "source": "Netlify (netlify.toml, _redirects SPA fallback)", "outcome": "cutover", "status": "pending", "next_action": "Publish on Lovable; point domain when ready"},
+    {"capability": "verification", "source": "-", "outcome": "verify", "status": "pending", "next_action": "Build, guest sign-in, progress + survey save/read-back"}
+  ]
+}
